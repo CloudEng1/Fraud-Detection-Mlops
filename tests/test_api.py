@@ -1,6 +1,15 @@
+from unittest.mock import patch
+
 from fastapi.testclient import TestClient
 
-from api.main import app
+
+class FakeModel:
+    def predict_proba(self, data):
+        return [[0.8, 0.2]]
+
+
+with patch("mlflow.sklearn.load_model", return_value=FakeModel()):
+    from api.main import app
 
 
 client = TestClient(app)
@@ -32,5 +41,6 @@ def test_predict():
     result = response.json()
 
     assert "fraud_probability" in result
+    assert "threshold" in result
     assert "prediction" in result
     assert "result" in result
