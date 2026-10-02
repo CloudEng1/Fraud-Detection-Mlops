@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fraud Detection | MLOps</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, Arial, sans-serif;
+      background: #0b1020;
+      color: #e8edf7;
+    }
+    .wrap { max-width: 1050px; margin: 0 auto; padding: 32px 20px 50px; }
+    .top { display:flex; justify-content:space-between; gap:20px; align-items:center; margin-bottom:24px; }
+    h1 { margin:0 0 6px; font-size:30px; }
+    .sub { color:#9aa6bd; margin:0; }
+    .badge {
+      padding:8px 12px; border-radius:999px; font-size:13px;
+      background:#1d2537; color:#aeb9cd; white-space:nowrap;
+    }
+    .badge.ok { background:#103526; color:#6ee7b7; }
+    .badge.bad { background:#3b1720; color:#fda4af; }
+    .card {
+      background:#121a2b; border:1px solid #26314a; border-radius:16px;
+      padding:22px; margin-bottom:20px;
+    }
+    .endpoint { display:flex; gap:10px; }
+    input, select {
+      width:100%; background:#0d1424; color:#eef2ff;
+      border:1px solid #34415d; border-radius:9px; padding:11px 12px;
+      outline:none;
+    }
+    input:focus, select:focus { border-color:#5b8cff; }
+    button {
+      border:0; border-radius:9px; padding:11px 16px; cursor:pointer;
+      font-weight:600; background:#4f7cff; color:white;
+    }
+    button.secondary { background:#202b42; }
+    button:hover { opacity:.9; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    .fields { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    label { display:block; font-size:13px; color:#aeb9cd; margin-bottom:7px; }
+    .full { grid-column:1/-1; }
+    .actions { display:flex; gap:10px; margin-top:18px; }
+    .result {
+      min-height:270px; display:flex; flex-direction:column;
+      justify-content:center; align-items:center; text-align:center;
+    }
+    .result h2 { margin:10px 0 5px; font-size:28px; }
+    .prob { font-size:48px; font-weight:800; margin:10px 0; }
+    .safe { color:#6ee7b7; }
+    .fraud { color:#fb7185; }
+    .muted { color:#8f9bb0; }
+    .stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; width:100%; margin-top:18px; }
+    .stat { background:#0d1424; border:1px solid #25314a; border-radius:10px; padding:12px; }
+    .stat span { display:block; color:#8f9bb0; font-size:12px; margin-bottom:4px; }
+    .stat strong { font-size:16px; }
+    .error { color:#fda4af; margin-top:12px; font-size:13px; }
+    .footer { text-align:center; color:#68758d; font-size:12px; margin-top:22px; }
+    @media (max-width: 760px) {
+      .grid, .fields { grid-template-columns:1fr; }
+      .top { align-items:flex-start; flex-direction:column; }
+      .endpoint { flex-direction:column; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>🛡️ Fraud Detection</h1>
+      <p class="sub">Simple frontend for the live ML inference API</p>
+    </div>
+    <div id="status" class="badge">Checking API...</div>
+  </div>
+
+  <div class="card">
+    <label for="apiUrl">API Endpoint</label>
+    <div class="endpoint">
+      <input id="apiUrl" value="http://13.235.80.88:8000" />
+      <button class="secondary" onclick="checkApi()">Test Connection</button>
+    </div>
+    <div id="error" class="error"></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Transaction</h3>
+      <div class="fields">
+        <div>
+          <label>Amount</label>
+          <input id="amount" type="number" value="800">
+        </div>
+        <div>
+          <label>Transaction Hour (0–23)</label>
+          <input id="hour" type="number" min="0" max="23" value="3">
+        </div>
+        <div>
+          <label>Merchant Category</label>
+          <select id="merchant">
+            <option>Grocery</option><option>Food</option><option>Travel</option>
+            <option selected>Electronics</option><option>Clothing</option>
+          </select>
+        </div>
+        <div>
+          <label>Cardholder Age</label>
+          <input id="age" type="number" value="28">
+        </div>
+        <div>
+          <label>Foreign Transaction</label>
+          <select id="foreign"><option value="0">No</option><option value="1" selected>Yes</option></select>
+        </div>
+        <div>
+          <label>Location Mismatch</label>
+          <select id="location"><option value="0">No</option><option value="1" selected>Yes</option></select>
+        </div>
+        <div>
+          <label>Device Trust Score (0–100)</label>
+          <input id="trust" type="number" min="0" max="100" value="28">
+        </div>
+        <div>
+          <label>Velocity Last 24h</label>
+          <input id="velocity" type="number" min="0" value="6">
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="secondary" onclick="loadFraud()">Fraud Sample</button>
+        <button onclick="predict()">Predict Transaction</button>
+      </div>
+    </div>
+
+    <div class="card result" id="result">
+      <div class="muted">Awaiting prediction</div>
+      <p class="muted">Enter transaction details and run the model.</p>
+    </div>
+  </div>
+
+  <div class="footer">FastAPI • Random Forest • MLflow • Docker • AWS ECS Fargate</div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const base = () => $('apiUrl').value.trim().replace(/\/+$/, '');
+
+  async function checkApi() {
+    $('status').textContent = 'Checking...';
+    $('status').className = 'badge';
+    $('error').textContent = '';
+    try {
+      const r = await fetch(base() + '/', { method:'GET' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      $('status').textContent = '● API Connected';
+      $('status').className = 'badge ok';
+    } catch (e) {
+      $('status').textContent = '● API Unreachable';
+      $('status').className = 'badge bad';
+      $('error').textContent = 'Could not reach the API. Check that the ECS task is RUNNING, the IP is current, port 8000 is open, and CORS is enabled.';
+    }
+  }
+
+  function loadFraud() {
+    $('amount').value = 800;
+    $('hour').value = 3;
+    $('merchant').value = 'Electronics';
+    $('age').value = 28;
+    $('foreign').value = 1;
+    $('location').value = 1;
+    $('trust').value = 28;
+    $('velocity').value = 6;
+  }
+
+  async function predict() {
+    $('result').innerHTML = '<div class="muted">Running model...</div>';
+    $('error').textContent = '';
+
+    const payload = {
+      amount: Number($('amount').value),
+      transaction_hour: Number($('hour').value),
+      merchant_category: $('merchant').value,
+      foreign_transaction: Number($('foreign').value),
+      location_mismatch: Number($('location').value),
+      device_trust_score: Number($('trust').value),
+      velocity_last_24h: Number($('velocity').value),
+      cardholder_age: Number($('age').value)
+    };
+
+    try {
+      const start = performance.now();
+      const r = await fetch(base() + '/predict', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Accept':'application/json'},
+        body:JSON.stringify(payload)
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail ? JSON.stringify(data.detail) : 'HTTP ' + r.status);
+
+      const probability = Number(data.fraud_probability);
+      const isFraud = data.prediction === 1 || data.result === 'Fraud';
+      const cls = isFraud ? 'fraud' : 'safe';
+
+      $('result').innerHTML = `
+        <div class="${cls}">● ${isFraud ? 'FRAUD DETECTED' : 'LEGITIMATE'}</div>
+        <div class="prob ${cls}">${(probability * 100).toFixed(1)}%</div>
+        <div class="muted">Fraud probability</div>
+        <div class="stats">
+          <div class="stat"><span>Threshold</span><strong>${Number(data.threshold).toFixed(2)}</strong></div>
+          <div class="stat"><span>Prediction</span><strong>${data.prediction}</strong></div>
+          <div class="stat"><span>Result</span><strong>${data.result}</strong></div>
+          <div class="stat"><span>Latency</span><strong>${Math.round(performance.now()-start)} ms</strong></div>
+        </div>`;
+    } catch (e) {
+      $('result').innerHTML = '<div class="fraud">API request failed</div><p class="muted">See the error message above.</p>';
+      $('error').textContent = e.message;
+    }
+  }
+
+  window.addEventListener('DOMContentLoaded', checkApi);
+</script>
+</body>
+</html>

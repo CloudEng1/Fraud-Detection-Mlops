@@ -4,7 +4,7 @@ An end-to-end fraud detection system built using Machine Learning and MLOps prac
 
 The project focuses on taking a fraud detection model from data preparation and experimentation to model tracking, API serving, testing, and containerization.
 
----
+------
 
 ## 📌 Project Overview
 

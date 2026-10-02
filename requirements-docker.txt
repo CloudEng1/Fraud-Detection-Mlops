@@ -10,3 +10,4 @@ cloudpickle==3.1.1
 
 pytest
 httpx
+boto3
